@@ -128,6 +128,13 @@ class Viewer {
       this.setBlockStateId(new Vec3(pos.x, pos.y, pos.z), stateId)
     })
 
+    emitter.on('reset', () => {
+      this.resetAll()
+      this.world = new WorldRenderer(this.scene)
+      this.entities = new Entities(this.scene)
+      this.primitives = new Primitives(this.scene, this.camera)
+    })
+
     this.domElement.addEventListener('pointerdown', (evt) => {
       const raycaster = new THREE.Raycaster()
       const mouse = new THREE.Vector2()
