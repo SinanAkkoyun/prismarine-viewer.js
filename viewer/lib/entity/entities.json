@@ -222,7 +222,7 @@
             "mirror": true,
             "pivot": [5, 22, 0],
             "cubes": [
-              {"origin": [5, 12, -1], "size": [2, 12, 2], "uv": [32, 16]}
+              {"origin": [5, 12, -1], "size_b": [2, 12, 2], "size": [0, 0, 0], "uv": [32, 16]}
             ]
           },
           {"name": "leftitem", "parent": "leftarm", "pivot": [6, 15, 1]},
@@ -240,7 +240,7 @@
             "parent": "body",
             "pivot": [-5, 22, 0],
             "cubes": [
-              {"origin": [-7, 12, -1], "size": [2, 12, 2], "uv": [24, 0]}
+              {"origin": [-7, 12, -1], "size_b": [2, 12, 2], "size": [0, 0, 0], "uv": [24, 0]}
             ]
           },
           {"name": "rightitem", "parent": "rightarm", "pivot": [-6, 15, 1]},

@@ -4,6 +4,8 @@ const TWEEN = require('@tweenjs/tween.js')
 const Entity = require('./entity/Entity')
 const { dispose3 } = require('./dispose')
 
+const { loadTexture } = globalThis.isElectron ? require('./utils.electron.js') : require('./utils')
+
 function getEntityMesh (entity, scene) {
   if (entity.name) {
     try {
@@ -53,24 +55,73 @@ function getEntityMesh (entity, scene) {
 
             e.mesh.add(sprite);
         }
+        // Add dynamic drop shadow
+
+        if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // either invisible or marker armorstand // armorstand index for version 1.8 is 10 apparently...
+          e.mesh.traverse(child => {
+              if (child instanceof THREE.Mesh) {
+                  child.material.transparent = true;
+                  child.material.opacity = 0.3;
+              }
+          });
+        } else {
+          addDynamicShadow(e.mesh, scene, '1.16.4');
+        }
+
         return e.mesh;
     } catch (err) {
         console.log(err);
     }
-}
-
-
-
-
-
-
-
-
+  }
   const geometry = new THREE.BoxGeometry(entity.width, entity.height, entity.width)
   geometry.translate(0, entity.height / 2, 0)
-  const material = new THREE.MeshBasicMaterial({ color: 0xff00ff })
+  const material = new THREE.MeshBasicMaterial({ color: 0x300030 })
   const cube = new THREE.Mesh(geometry, material)
   return cube
+}
+
+function addDynamicShadow(mesh, scene, version) {
+  const shadowGeo = new THREE.PlaneBufferGeometry(1, 1);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    depthWrite: false,
+    opacity: 0.3
+  });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowMesh.rotation.x = -Math.PI / 2;
+  shadowMesh.position.y = -0.01;
+
+  loadTexture(`textures/${version}/misc/shadow.png`, (texture) => {
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    texture.flipY = false;
+    shadowMat.map = texture;
+    shadowMat.needsUpdate = true;
+  });
+
+  mesh.add(shadowMesh);
+
+  shadowMesh.position.y = mesh.position.y + 0.01;
+  /*
+  // Delay raycasting to ensure all terrain is loaded
+  setTimeout(() => {
+    const raycaster = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+    raycaster.set(new THREE.Vector3(mesh.position.x, mesh.position.y + 1, mesh.position.z), down);
+    
+    shadowMesh.position.y = mesh.position.y + 1;
+
+    const intersects = raycaster.intersectObjects(scene.children, true);
+    const validIntersects = intersects.filter(intersect => intersect.object !== mesh && intersect.object !== shadowMesh);
+    if (validIntersects.length > 0) {
+      const closest = validIntersects[0];
+      shadowMesh.position.y = closest.point.y + 0.1;
+    } else {
+      // No valid intersection found, adjust as necessary
+       // Example fallback position
+    }
+  }, 60); // Adjust delay as necessary based on your scene's load time
+  */
 }
 
 class Entities {
