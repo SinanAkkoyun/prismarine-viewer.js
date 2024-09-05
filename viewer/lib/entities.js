@@ -46,6 +46,8 @@ function getEntityMesh (entity, scene) {
             // Update texture for high resolution
             const tex = new THREE.Texture(canvas);
             tex.needsUpdate = true;
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
             const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
             const sprite = new THREE.Sprite(spriteMat);
 
