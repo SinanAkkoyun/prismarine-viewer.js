@@ -12,54 +12,11 @@ function getEntityMesh (entity, scene) {
         const e = new Entity('1.16.4', entity.name, scene);
 
         if (entity.username !== undefined) {
-            const fixedHeight = 0.25; // Fixed height of the sprite
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-
-            // Disabling anti-aliasing
-            ctx.imageSmoothingEnabled = false;
-
-            // Determine the font size for high resolution
-            const fontSize = 200; // High initial font size for better clarity
-            ctx.font = `${fontSize}px 'Minecraft', Arial`;
-
-            // Calculate text width with high-resolution font size
-            let textWidth = ctx.measureText(entity.username).width;
-
-            // Set canvas dimensions large enough for high-res rendering
-            canvas.width = textWidth + 25; // Ensure there's padding to avoid cutting off text
-            canvas.height = fontSize; // Height as the font size for 1:1 text block
-
-            // Apply a semi-transparent black background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Slightly transparent black background
-            ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill the entire canvas
-
-            // Reapply the font settings as resizing canvas resets the context
-            ctx.font = `${fontSize}px 'Minecraft', Arial`;
-            ctx.fillStyle = '#FFFFFF'; // Text color set to white for contrast
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle'; // Vertical alignment
-
-            // Draw the text centered
-            ctx.fillText(entity.username, canvas.width / 2, canvas.height / 2);
-
-            // Update texture for high resolution
-            const tex = new THREE.Texture(canvas);
-            tex.needsUpdate = true;
-            tex.magFilter = THREE.NearestFilter;
-            tex.minFilter = THREE.NearestFilter;
-            const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
-            const sprite = new THREE.Sprite(spriteMat);
-
-            // Scale sprite to match fixed height and maintain text aspect ratio
-            sprite.scale.set(textWidth / fontSize * fixedHeight, fixedHeight, 1);
-            sprite.position.y += entity.height + 0.5;
-
-            e.mesh.add(sprite);
+            createNametag(entity, e.mesh);
         }
-        // Add dynamic drop shadow
 
-        if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // either invisible or marker armorstand // armorstand index for version 1.8 is 10 apparently...
+        // Entity invisible or marker armor stand
+        if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // armorstand index for version 1.8 is 10 apparently...
           e.mesh.traverse(child => {
               if (child instanceof THREE.Mesh) {
                   child.material.transparent = true;
@@ -67,6 +24,7 @@ function getEntityMesh (entity, scene) {
               }
           });
         } else {
+          // Add dynamic drop shadow
           addDynamicShadow(e.mesh, scene, '1.16.4');
         }
 
@@ -81,6 +39,55 @@ function getEntityMesh (entity, scene) {
   const cube = new THREE.Mesh(geometry, material)
   return cube
 }
+
+
+function createNametag(entity, mesh) {
+  const fixedHeight = 0.25; // Fixed height of the sprite
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Disabling anti-aliasing
+  ctx.imageSmoothingEnabled = false;
+
+  // Determine the font size for high resolution
+  const fontSize = 200; // High initial font size for better clarity
+  ctx.font = `${fontSize}px 'Minecraft', Arial`;
+
+  // Calculate text width with high-resolution font size
+  let textWidth = ctx.measureText(entity.username).width;
+
+  // Set canvas dimensions large enough for high-res rendering
+  canvas.width = textWidth + 25; // Ensure there's padding to avoid cutting off text
+  canvas.height = fontSize; // Height as the font size for 1:1 text block
+
+  // Apply a semi-transparent black background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Slightly transparent black background
+  ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill the entire canvas
+
+  // Reapply the font settings as resizing canvas resets the context
+  ctx.font = `${fontSize}px 'Minecraft', Arial`;
+  ctx.fillStyle = '#FFFFFF'; // Text color set to white for contrast
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle'; // Vertical alignment
+
+  // Draw the text centered
+  ctx.fillText(entity.username, canvas.width / 2, canvas.height / 2);
+
+  // Update texture for high resolution
+  const tex = new THREE.Texture(canvas);
+  tex.needsUpdate = true;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+
+  // Scale sprite to match fixed height and maintain text aspect ratio
+  sprite.scale.set(textWidth / fontSize * fixedHeight, fixedHeight, 1);
+  sprite.position.y += entity.height + 0.5;
+
+  mesh.add(sprite);
+}
+
 
 function addDynamicShadow(mesh, scene, version) {
   const shadowGeo = new THREE.PlaneBufferGeometry(1, 1);
