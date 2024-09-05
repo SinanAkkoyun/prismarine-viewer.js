@@ -3,12 +3,12 @@ const { Vec3 } = require('vec3')
 const EventEmitter = require('events')
 
 class WorldView extends EventEmitter {
-  constructor (world, viewDistance, position = new Vec3(0, 0, 0), emitter = null) {
+  constructor (world, viewDistance, position = new Vec3(0, -64, 0), emitter = null) {
     super()
     this.world = world
     this.viewDistance = viewDistance
     this.loadedChunks = {}
-    this.lastPos = new Vec3(0, 0, 0).update(position)
+    this.lastPos = new Vec3(0, -64, 0).update(position)
     this.emitter = emitter || this
 
     this.listeners = {}
@@ -68,7 +68,7 @@ class WorldView extends EventEmitter {
 
     const positions = []
     spiral(this.viewDistance * 2, this.viewDistance * 2, (x, z) => {
-      const p = new Vec3((botX + x) * 16, 0, (botZ + z) * 16)
+      const p = new Vec3((botX + x) * 16, -64, (botZ + z) * 16)
       positions.push(p)
     })
 
@@ -110,14 +110,14 @@ class WorldView extends EventEmitter {
       for (const coords of Object.keys(this.loadedChunks)) {
         const x = parseInt(coords.split(',')[0])
         const z = parseInt(coords.split(',')[1])
-        const p = new Vec3(x, 0, z)
+        const p = new Vec3(x, -64, z)
         if (!newView.contains(Math.floor(x / 16), Math.floor(z / 16))) {
           this.unloadChunk(p)
         }
       }
       const positions = []
       spiral(this.viewDistance * 2, this.viewDistance * 2, (x, z) => {
-        const p = new Vec3((botX + x) * 16, 0, (botZ + z) * 16)
+        const p = new Vec3((botX + x) * 16, -64, (botZ + z) * 16)
         if (!this.loadedChunks[`${p.x},${p.z}`]) {
           positions.push(p)
         }
