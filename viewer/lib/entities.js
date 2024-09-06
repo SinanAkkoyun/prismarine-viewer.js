@@ -1,23 +1,89 @@
 const THREE = require('three')
 const TWEEN = require('@tweenjs/tween.js')
+const { loadImage } = require('skinview-utils')
+const { PlayerObject } = require('skinview3d')
 
 const Entity = require('./entity/Entity')
 const { dispose3 } = require('./dispose')
 
 const { loadTexture } = globalThis.isElectron ? require('./utils.electron.js') : require('./utils')
 
-function getEntityMesh (entity, scene) {
+const getUUIDFromUsername = async (username) => {
+  const response = await fetch(`https://mc-heads.net/minecraft/profile/${username}`);
+  const data = await response.json();
+  return data.id; // This will be the UUID
+}
+const getSkinFromUUID = async (uuid) => {
+  const response = await fetch(`https://cors-anywhere.herokuapp.com/https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`);
+  const data = await response.json();
+  const properties = data.properties.find(prop => prop.name === 'textures');
+  const textureData = JSON.parse(atob(properties.value)); // Decoding the base64 data
+  return textureData.textures.SKIN.url; // Skin URL
+}
+const getSkinFromUsername = async (username) => {
+  return (await (await fetch(`http://localhost:3001/profile/${username}`)).json()).skinUrl
+} // async (username) => await getSkinFromUUID(await getUUIDFromUsername(username))
+
+
+async function createPlayerMesh(skinUrl) {
+  // Load the skin image from the URL
+  const skinImage = await loadImage(skinUrl);
+
+  // Create a canvas to use the skin as a texture
+  const skinCanvas = document.createElement('canvas');
+  skinCanvas.width = skinImage.width;
+  skinCanvas.height = skinImage.height;
+  const ctx = skinCanvas.getContext('2d');
+  ctx.drawImage(skinImage, 0, 0);
+
+  // Create the player object from skinview3d
+  const player = new PlayerObject();
+
+  // Create the texture from the canvas
+  const skinTexture = new THREE.CanvasTexture(skinCanvas);
+
+  // Set nearest neighbor filtering for the texture
+  skinTexture.magFilter = THREE.NearestFilter; // For magnification (scaling up)
+  skinTexture.minFilter = THREE.NearestFilter; // For minification (scaling down)
+  skinTexture.needsUpdate = true; // Ensure the texture updates
+
+  // Apply the texture to the player object
+  player.skin.map = skinTexture;
+  player.skin.visible = true; // Ensure the skin is visible
+  player.cape.visible = false;
+
+  const parentGroup = new THREE.Group(); // Create an empty group to act as a parent
+  parentGroup.add(player); // Parent the player to this group
+
+  // Apply transformations to the parent group
+  const scale = 0.0625 * 0.9
+  player.scale.set(scale, scale, scale); // Scale the player
+  player.rotation.y = Math.PI; // Rotate 90 degrees on the Y-axis
+  player.position.y = 0.9;
+
+  return parentGroup; // Return the player mesh (a THREE.Object3D)
+}
+
+async function getEntityMesh (entity, scene) {
   if (entity.name) {
     try {
         const e = new Entity('1.16.4', entity.name, scene);
 
+        let mesh = e.mesh
+
+        if(entity.name === 'player') {
+          // 'http://localhost:3030/textures/Console_Bot.png'
+
+          mesh = await createPlayerMesh(await getSkinFromUsername(entity.username))
+        }
+
         if (entity.username !== undefined) {
-            createNametag(entity, e.mesh);
+            createNametag(entity, mesh);
         }
 
         // Entity invisible or marker armor stand
         if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // armorstand index for version 1.8 is 10 apparently...
-          e.mesh.traverse(child => {
+          mesh.traverse(child => {
               if (child instanceof THREE.Mesh) {
                   child.material.transparent = true;
                   child.material.opacity = 0.3;
@@ -25,12 +91,12 @@ function getEntityMesh (entity, scene) {
           });
         } else {
           // Add dynamic drop shadow
-          addDynamicShadow(e.mesh, scene, '1.16.4');
+          addDynamicShadow(mesh, scene, '1.16.4');
         }
 
-        return e.mesh;
+        return mesh;
     } catch (err) {
-        console.log(err);
+      if(!err.message.includes('Unknown')) console.log(err);
     }
   }
   const geometry = new THREE.BoxGeometry(entity.width, entity.height, entity.width)
@@ -61,7 +127,7 @@ function createNametag(entity, mesh) {
   canvas.height = fontSize; // Height as the font size for 1:1 text block
 
   // Apply a semi-transparent black background
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Slightly transparent black background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.275)'; // Slightly transparent black background
   ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill the entire canvas
 
   // Reapply the font settings as resizing canvas resets the context
@@ -83,7 +149,7 @@ function createNametag(entity, mesh) {
 
   // Scale sprite to match fixed height and maintain text aspect ratio
   sprite.scale.set(textWidth / fontSize * fixedHeight, fixedHeight, 1);
-  sprite.position.y += entity.height + 0.5;
+  sprite.position.y += entity.height + 0.26;
 
   mesh.add(sprite);
 }
@@ -147,9 +213,9 @@ class Entities {
     this.entities = {}
   }
 
-  update (entity) {
+  async update (entity) {
     if (!this.entities[entity.id]) {
-      const mesh = getEntityMesh(entity, this.scene)
+      const mesh = await getEntityMesh(entity, this.scene)
       if (!mesh) return
       this.entities[entity.id] = mesh
       this.scene.add(mesh)

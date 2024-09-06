@@ -201,7 +201,7 @@ function getMesh (texture, jsonModel) {
 }
 
 class Entity {
-  constructor (version, type, scene) {
+  constructor (version, type, scene, texturePath) {
     const e = entities[type]
     if (!e) throw new Error(`Unknown entity ${type}`)
 
@@ -210,7 +210,7 @@ class Entity {
       const texture = e.textures[name]
       if (!texture) continue
       // console.log(JSON.stringify(jsonModel, null, 2))
-      const mesh = getMesh(texture.replace('textures', 'textures/' + version) + '.png', jsonModel)
+      const mesh = getMesh(texturePath ?? texture.replace('textures', 'textures/' + version) + '.png', jsonModel)
       /* const skeletonHelper = new THREE.SkeletonHelper( mesh )
       skeletonHelper.material.linewidth = 2
       scene.add( skeletonHelper ) */
