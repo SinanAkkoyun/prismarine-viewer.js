@@ -71,18 +71,22 @@ async function getEntityMesh (entity, scene) {
 
         let mesh = e.mesh
 
-        if(entity.name === 'player') {
+        if(entity.name === 'player' && entity.username) {
           // 'http://localhost:3030/textures/Console_Bot.png'
-
-          mesh = await createPlayerMesh(await getSkinFromUsername(entity.username))
+          const trimmedUsername = entity.username.replace(/[^\w]/g, '').trim()  // TODO: either fix ling or pass port
+          mesh = await createPlayerMesh(trimmedUsername !== '' ? await getSkinFromUsername(trimmedUsername) : `http://localhost:3030/textures/suit_steve.png`)
         }
-
+        
         if (entity.username !== undefined) {
             createNametag(entity, mesh);
         }
 
+        if (entity.name === 'armor_stand') {
+          console.log(entity.metadata[2])
+        }
+
         // Entity invisible or marker armor stand
-        if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // armorstand index for version 1.8 is 10 apparently...
+        if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[10] & 0x10) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // armorstand index for version 1.8 is 10 apparently...
           mesh.traverse(child => {
               if (child instanceof THREE.Mesh) {
                   child.material.transparent = true;
@@ -96,7 +100,7 @@ async function getEntityMesh (entity, scene) {
 
         return mesh;
     } catch (err) {
-      if(!err.message.includes('Unknown')) console.log(err);
+      // if(!err.message.includes('item_frame')) console.log(err);
     }
   }
   const geometry = new THREE.BoxGeometry(entity.width, entity.height, entity.width)
@@ -108,6 +112,8 @@ async function getEntityMesh (entity, scene) {
 
 
 function createNametag(entity, mesh) {
+  if(entity.username.replace(/[^\w]/g, '').trim() === '') return
+  
   const fixedHeight = 0.25; // Fixed height of the sprite
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -137,7 +143,7 @@ function createNametag(entity, mesh) {
   ctx.textBaseline = 'middle'; // Vertical alignment
 
   // Draw the text centered
-  ctx.fillText(entity.username, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(entity.username.replace(/[^\w]/g, ''), canvas.width / 2, canvas.height / 2);
 
   // Update texture for high resolution
   const tex = new THREE.Texture(canvas);
