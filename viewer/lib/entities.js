@@ -24,6 +24,35 @@ const getSkinFromUsername = async (username) => {
   return (await (await fetch(`http://localhost:3001/profile/${username}`)).json()).skinUrl
 } // async (username) => await getSkinFromUUID(await getUUIDFromUsername(username))
 
+function parseJsonForTextAndColor(jsonString) {
+  // Parse the JSON string into an object
+  let jsonObject = JSON.parse(jsonString);
+
+  // Initialize an array to store the color-text pairs
+  let colorTextPairs = [];
+
+  // Define a recursive function to navigate through the object
+  function extractColorTextPairs(obj) {
+    // Check if the current object has a 'text' and the 'text' is not empty
+    if (obj.text && obj.text.trim() !== "") {
+      // Check if there's a color assigned, if not, set it as undefined or a default
+      let color = obj.color || 'no-color';
+      // Add the color-text pair to the array
+      colorTextPairs.push({ text: obj.text, color: color });
+    }
+
+    // If there's an 'extra' property, recurse into it
+    if (obj.extra && Array.isArray(obj.extra)) {
+      obj.extra.forEach(subObj => extractColorTextPairs(subObj));
+    }
+  }
+
+  // Start the recursive extraction from the root object
+  extractColorTextPairs(jsonObject);
+
+  // Return the array of color-text pairs
+  return colorTextPairs;
+}
 
 async function createPlayerMesh(skinUrl) {
   // Load the skin image from the URL
@@ -64,7 +93,7 @@ async function createPlayerMesh(skinUrl) {
   return parentGroup; // Return the player mesh (a THREE.Object3D)
 }
 
-async function getEntityMesh (entity, scene) {
+async function getEntityMesh (entity, scene, renderInvisible=false) {
   if (entity.name) {
     try {
         const e = new Entity('1.16.4', entity.name, scene);
@@ -73,7 +102,7 @@ async function getEntityMesh (entity, scene) {
 
         if(entity.name === 'player' && entity.username) {
           // 'http://localhost:3030/textures/Console_Bot.png'
-          const trimmedUsername = entity.username.replace(/[^\w]/g, '').trim()  // TODO: either fix ling or pass port
+          const trimmedUsername = entity.username.replace(/[^\w\säöüÄÖÜß]/g, '').trim()  // TODO: either fix ling or pass port
           mesh = await createPlayerMesh(trimmedUsername !== '' ? await getSkinFromUsername(trimmedUsername) : `http://localhost:3030/textures/suit_steve.png`)
         }
         
@@ -82,17 +111,26 @@ async function getEntityMesh (entity, scene) {
         }
 
         if (entity.name === 'armor_stand') {
-          console.log(entity.metadata[2])
+          createNametag(undefined, mesh, parseJsonForTextAndColor(entity.metadata[2])[0]);
         }
 
         // Entity invisible or marker armor stand
         if ((entity.metadata[0] & 0x20) !== 0 || (entity.metadata[10] & 0x10) !== 0 || (entity.metadata[15] & 0x10) !== 0) { // armorstand index for version 1.8 is 10 apparently...
-          mesh.traverse(child => {
+          if(renderInvisible) {
+            mesh.traverse(child => {
+                if (child instanceof THREE.Mesh) {
+                    child.material.transparent = true;
+                    child.material.opacity = 0.3;
+                }
+            });
+          } else {
+            // Hide the entity mesh but keep nametag visible
+            mesh.traverse(child => {
               if (child instanceof THREE.Mesh) {
-                  child.material.transparent = true;
-                  child.material.opacity = 0.3;
+                  child.visible = false;
               }
           });
+          }
         } else {
           // Add dynamic drop shadow
           addDynamicShadow(mesh, scene, '1.16.4');
@@ -110,7 +148,7 @@ async function getEntityMesh (entity, scene) {
   return cube
 }
 
-
+/*
 function createNametag(entity, mesh) {
   if(entity.username.replace(/[^\w]/g, '').trim() === '') return
   
@@ -156,6 +194,59 @@ function createNametag(entity, mesh) {
   // Scale sprite to match fixed height and maintain text aspect ratio
   sprite.scale.set(textWidth / fontSize * fixedHeight, fixedHeight, 1);
   sprite.position.y += entity.height + 0.26;
+
+  mesh.add(sprite);
+}
+*/
+function createNametag(entity, mesh, nametag) {
+  if(!nametag && entity) nametag = { text: entity.username, color: '#FFFFFF' }
+  if (nametag.text.replace(/[^\w\säöüÄÖÜß]/g, '').trim() === '') return;
+  
+  const fixedHeight = 0.25; // Fixed height of the sprite
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Disabling anti-aliasing
+  ctx.imageSmoothingEnabled = false;
+
+  // Determine the font size for high resolution
+  const fontSize = 200; // High initial font size for better clarity
+  ctx.font = `${fontSize}px 'Minecraft', Arial`;
+
+  // Clean up the text to remove any non-word characters
+  const cleanText = nametag.text.replace(/[^\w\säöüÄÖÜß]/g, '');
+
+  // Calculate text width with high-resolution font size
+  let textWidth = ctx.measureText(cleanText).width;
+
+  // Set canvas dimensions large enough for high-res rendering
+  canvas.width = textWidth + 25; // Ensure there's padding to avoid cutting off text
+  canvas.height = fontSize; // Height as the font size for 1:1 text block
+
+  // Apply a semi-transparent black background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.275)'; // Slightly transparent black background
+  ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill the entire canvas
+
+  // Reapply the font settings as resizing canvas resets the context
+  ctx.font = `${fontSize}px 'Minecraft', Arial`;
+  ctx.fillStyle = nametag.color; // Text color set from nametag
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle'; // Vertical alignment
+
+  // Draw the text centered
+  ctx.fillText(cleanText, canvas.width / 2, canvas.height / 2);
+
+  // Update texture for high resolution
+  const tex = new THREE.Texture(canvas);
+  tex.needsUpdate = true;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+
+  // Scale sprite to match fixed height and maintain text aspect ratio
+  sprite.scale.set(textWidth / fontSize * fixedHeight, fixedHeight, 1);
+  sprite.position.y += (entity ? (entity.height) : 0)  + 0.26;
 
   mesh.add(sprite);
 }
